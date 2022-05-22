@@ -10,6 +10,9 @@
 # Local state files & OS specifics
 .DS_Store
 node_modules/
+*.js
+!jest.config.js
+*.d.ts
 lerna-debug.log
 dist/
 pack/
