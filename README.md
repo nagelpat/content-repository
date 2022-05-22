@@ -6,7 +6,7 @@
 
 > **This is a stable example. It should successfully build out of the box**
 >
-> This examples is built on Construct Libraries marked "Stable" with the exception of [amplify_alpha](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-amplify-alpha-readme.html) but thorougly tested. There are no infrastructure prerequisites to build.
+> This examples is built on Construct Libraries marked "Stable" with the exception of [amplify_alpha](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-amplify-alpha-readme.html) but thoroughly tested. There are no infrastructure prerequisites to build.
 
 ---
 <!--END STABILITY BANNER-->
