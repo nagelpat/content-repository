@@ -1,5 +1,5 @@
-import { Stack, StackProps } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-export declare class BlogseriesStack extends Stack {
-    constructor(scope: Construct, id: string, props?: StackProps);
+import { Construct } from "constructs";
+import * as cdk from "aws-cdk-lib";
+export declare class BlogseriesStack extends cdk.Stack {
+    constructor(scope: Construct, id: string, props?: cdk.StackProps);
 }

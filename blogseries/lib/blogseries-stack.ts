@@ -104,6 +104,7 @@ export class BlogseriesStack extends cdk.Stack {
         writeAttributes: clientWriteAttributes,
       }
     );
+    userPoolClient.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
     // create Cognito Identity Pool id
     const identityPool = new cognito.CfnIdentityPool(
@@ -120,6 +121,7 @@ export class BlogseriesStack extends cdk.Stack {
         ],
       }
     );
+    identityPool.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
     // create User
     const isAnonymousCognitoGroupRole = new iam.Role(
@@ -193,7 +195,6 @@ export class BlogseriesStack extends cdk.Stack {
 
     // create s3 bucket to upload documents
     const s3Bucket = new s3.Bucket(this, "s3-bucket", {
-      bucketName: "blog-bucket-nagelpat", //TODO change name
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       versioned: false,
@@ -302,21 +303,16 @@ export class BlogseriesStack extends cdk.Stack {
     C2groupIAMrole.addToPolicy(s3ListBucketPolicy);
     s3Bucket.grantReadWrite(AdminGroupIAMrole);
 
-    // Creation of the source control repository
-    // const repository = new codecommit.Repository(this, "CodeRepoFrontend", {
-    //   repositoryName: "react-frontend-3",
-    //   description: "code repo for OpenSearch free text and semantic search",
-    // });
-
     // creation of the source control repository for the react frontend app hosted on Amplify
     const repository = new codecommit.Repository(this, "frontend-code-repo", {
       repositoryName: "frontend-code",
       code: codecommit.Code.fromDirectory(
-        path.join(__dirname, "/../../../../react-frontend-3/"),
+        path.join(__dirname, "/../../react-ui/"),
         "main"
       ), // Bug: branchName property is disregarded
       description: "code repository for react frontend application",
     });
+    repository.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
     // Creation of SSM Parm for Amplify Auth backend configuration
     const ampfliyAuthParam = new ssm.StringParameter(
@@ -408,6 +404,8 @@ export class BlogseriesStack extends cdk.Stack {
         },
       }),
     });
+    amplifyApp.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+
     // connect to main branch of the code repo
     const mainBranch = amplifyApp.addBranch("main", {
       autoBuild: true,
@@ -475,8 +473,8 @@ export class BlogseriesStack extends cdk.Stack {
         allowCredentials: true,
       },
     });
+    api.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
-    api.root.addMethod("ANY"); //todo check
     const listdocs = api.root.addResource("list-docs");
     const signedURL = api.root.addResource("signedURL");
 
@@ -581,59 +579,10 @@ export class BlogseriesStack extends cdk.Stack {
       ],
     });
 
-    // trigger to set S3 bucket CORS rule
-    // see https://github.com/aws/aws-cdk/issues/19272 when updating the handler
-    // const corsTrigger = new triggers.TriggerFunction(cdk.Stack.of(this), "cdkTriggerS3CORSRuleSet", {
-    //   environment: {
-    //     corsRule: `{"CORSRules" : [{"AllowedHeaders":["*"],"AllowedMethods":["GET","POST", "PUT"],"AllowedOrigins":["${allowOriginURL}"]}]}`,
-    //     regionName: cdk.Stack.of(this).region,
-    //     bucketName: s3Bucket.bucketName,
-    //   },
-    //   code: lambda.Code.fromAsset("lambdas/cdk"),
-    //   runtime: lambda.Runtime.PYTHON_3_8,
-    //   handler: "trigger_s3_corsRule.lambda_handler",
-    //   timeout: cdk.Duration.seconds(30),
-    //   executeOnHandlerChange: false,
-    //   initialPolicy: [
-    //     new iam.PolicyStatement({
-    //       resources: [s3Bucket.bucketArn],
-    //       actions: ["s3:PutBucketCORS"],
-    //     }),
-    //   ],
-    // });
-    
-    //testing onlz - separating lambda function from the trigger
-    // const corsLambda = new lambda.Function(this, "corsLambda", {
-    //   environment: {
-    //     corsRule: `{"CORSRules" : [{"AllowedHeaders":["*"],"AllowedMethods":["GET","POST", "PUT"],"AllowedOrigins":["${allowOriginURL}"]}]}`,
-    //     regionName: cdk.Stack.of(this).region,
-    //     bucketName: s3Bucket.bucketName,
-    //   },
-    //   code: lambda.Code.fromAsset("lambdas/cdk"),
-    //   runtime: lambda.Runtime.PYTHON_3_8,
-    //   handler: "trigger_s3_corsRule.lambda_handler",
-    //   timeout: cdk.Duration.seconds(30),
-    //   initialPolicy: [
-    //     new iam.PolicyStatement({
-    //       resources: [s3Bucket.bucketArn],
-    //       actions: ["s3:PutBucketCORS"],
-    //     }),
-    //   ],
-    // });
-    
-    // corsLambda.grantInvoke(new iam.ServicePrincipal("lambda.amazonaws.com"));
-    // corsLambda.currentVersion.grantInvoke(new iam.ServicePrincipal("lambda.amazonaws.com"));
-    
-    // const corsTrigger = new triggers.Trigger(cdk.Stack.of(this), "cdkTriggerS3CORSRuleSet", {
-    //   handler: corsLambda,
-    //   executeOnHandlerChange: false,
-    // });
-    // corsTrigger.node.addDependency(corsLambda);
-
 
     // relevant stack outputs
-    new cdk.CfnOutput(this, "APIGatewayEndpoint", {
-      value: api.url,
+    new cdk.CfnOutput(this, "amplifyAppURL", {
+      value: allowOriginURL,
     });
     new cdk.CfnOutput(this, "documentStoreBucketName", {
       value: s3Bucket.bucketName,
@@ -641,20 +590,5 @@ export class BlogseriesStack extends cdk.Stack {
     new cdk.CfnOutput(this, "region", {
       value: cdk.Stack.of(this).region,
     });
-    // new cdk.CfnOutput(this, "corsRule", {
-    //   value: `{"CORSRules" : [{"AllowedHeaders":["*"],"AllowedMethods":["GET","POST", "PUT"],"AllowedOrigins":["${allowOriginURL}"]}]}`,
-    // });
-    new cdk.CfnOutput(this, "amplifyAppURL", {
-      value: allowOriginURL,
-    });
-    // new cdk.CfnOutput(this, "amplifyAuthConfig", {
-    //   value: `{"BlogseriesStack":{"bucketName": "${
-    //     s3Bucket.bucketName
-    //   }","userPoolClientId": "${userPoolClient.userPoolClientId}","region": "${
-    //     cdk.Stack.of(this).region
-    //   }","userPoolId": "${userPool.userPoolId}","identityPoolId": "${
-    //     identityPool.ref
-    //   }"}}`,
-    // });
   }
 }
