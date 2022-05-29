@@ -19,26 +19,12 @@ export class BlogseriesStack extends cdk.Stack {
 
     const userPool = new cognito.UserPool(this, "userpool", {
       userPoolName: "blog-user-pool",
-      selfSignUpEnabled: false,
+      selfSignUpEnabled: true,
       signInAliases: {
-        email: true,
+        username: true,
       },
       autoVerify: {
         email: true,
-      },
-      standardAttributes: {
-        givenName: {
-          required: true,
-          mutable: true,
-        },
-        familyName: {
-          required: true,
-          mutable: true,
-        },
-      },
-      customAttributes: {
-        group: new cognito.StringAttribute({ mutable: true }),
-        isAdmin: new cognito.StringAttribute({ mutable: true }),
       },
       passwordPolicy: {
         minLength: 6,
@@ -48,45 +34,11 @@ export class BlogseriesStack extends cdk.Stack {
         requireSymbols: false,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      signInCaseSensitive: false,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // User Pool Client attributes
-    const standardCognitoAttributes = {
-      givenName: true,
-      familyName: true,
-      email: true,
-      emailVerified: true,
-      address: true,
-      birthdate: true,
-      gender: true,
-      locale: true,
-      middleName: true,
-      fullname: true,
-      nickname: true,
-      phoneNumber: true,
-      phoneNumberVerified: true,
-      profilePicture: true,
-      preferredUsername: true,
-      profilePage: true,
-      timezone: true,
-      lastUpdateTime: true,
-      website: true,
-    };
-
-    const clientReadAttributes = new cognito.ClientAttributes()
-      .withStandardAttributes(standardCognitoAttributes)
-      .withCustomAttributes(...["group", "isAdmin"]);
-
-    const clientWriteAttributes = new cognito.ClientAttributes()
-      .withStandardAttributes({
-        ...standardCognitoAttributes,
-        emailVerified: false,
-        phoneNumberVerified: false,
-      })
-      .withCustomAttributes(...["group"]);
-
-    // //  User Pool Client
+    // User Pool Client
     const userPoolClient = new cognito.UserPoolClient(
       this,
       "blog-userpool-client",
@@ -100,8 +52,6 @@ export class BlogseriesStack extends cdk.Stack {
         supportedIdentityProviders: [
           cognito.UserPoolClientIdentityProvider.COGNITO,
         ],
-        readAttributes: clientReadAttributes,
-        writeAttributes: clientWriteAttributes,
       }
     );
     userPoolClient.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
@@ -123,8 +73,7 @@ export class BlogseriesStack extends cdk.Stack {
     );
     identityPool.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
-    // create User
-    const isAnonymousCognitoGroupRole = new iam.Role(
+    const cognitoUnauthenticatedRole = new iam.Role(
       this,
       "anonymous-group-role",
       {
@@ -141,15 +90,18 @@ export class BlogseriesStack extends cdk.Stack {
           },
           "sts:AssumeRoleWithWebIdentity"
         ),
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName(
-            "service-role/AWSLambdaBasicExecutionRole"
-          ),
-        ],
       }
     );
+    cognitoUnauthenticatedRole.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+            "mobileanalytics:PutEvents",
+            "cognito-sync:*"
+        ],
+        resources: ["*"],
+    }));
 
-    const isUserCognitoGroupRole = new iam.Role(this, "users-group-role", {
+    const cognitoAuthenticatedRole = new iam.Role(this, "users-group-role", {
       description: "Default role for authenticated users",
       assumedBy: new iam.FederatedPrincipal(
         "cognito-identity.amazonaws.com",
@@ -163,12 +115,17 @@ export class BlogseriesStack extends cdk.Stack {
         },
         "sts:AssumeRoleWithWebIdentity"
       ),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "service-role/AWSLambdaBasicExecutionRole"
-        ),
-      ],
     });
+
+    cognitoAuthenticatedRole.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+            "mobileanalytics:PutEvents",
+            "cognito-sync:*",
+            "cognito-identity:*"
+        ],
+        resources: ["*"],
+    }));
 
     new cognito.CfnIdentityPoolRoleAttachment(
       this,
@@ -176,8 +133,8 @@ export class BlogseriesStack extends cdk.Stack {
       {
         identityPoolId: identityPool.ref,
         roles: {
-          authenticated: isUserCognitoGroupRole.roleArn,
-          unauthenticated: isAnonymousCognitoGroupRole.roleArn,
+          authenticated: cognitoAuthenticatedRole.roleArn,
+          unauthenticated: cognitoUnauthenticatedRole.roleArn,
         },
         roleMappings: {
           mapping: {

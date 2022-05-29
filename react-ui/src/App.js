@@ -1,7 +1,7 @@
 import React from 'react';
 import './App.css';
 import Amplify from 'aws-amplify';
-import { AmplifyAuthenticator, AmplifySignOut } from '@aws-amplify/ui-react';
+import { AmplifyAuthenticator, AmplifySignOut, AmplifySignUp } from '@aws-amplify/ui-react';
 import { AuthState, onAuthUIStateChange } from '@aws-amplify/ui-components';
 import Homepage from './components/homepage';
 
@@ -34,7 +34,17 @@ const AuthStateApp = () => {
       <div id='homepage' ><Homepage /></div>
     </div>
   ) : (
-    <AmplifyAuthenticator />
+    <AmplifyAuthenticator>
+      {/* username and email only for signup */}
+        <AmplifySignUp
+          slot="sign-up"
+          formFields={[
+            { type: 'username' },
+            { type: 'email' },
+            { type: 'password' },
+          ]}
+        />
+    </AmplifyAuthenticator>
   );
 };
 
