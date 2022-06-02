@@ -23,7 +23,7 @@ export class BlogseriesStack extends cdk.Stack {
       signInAliases: {
         username: true,
       },
-      autoVerify: {
+      autoVerify: { //TODO might need to be removed when email is not set
         email: true,
       },
       passwordPolicy: {
@@ -33,7 +33,7 @@ export class BlogseriesStack extends cdk.Stack {
         requireUppercase: false,
         requireSymbols: false,
       },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY, //TODO NONE
       signInCaseSensitive: false,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -73,6 +73,7 @@ export class BlogseriesStack extends cdk.Stack {
     );
     identityPool.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
+    // default role and permissions for unauthenticated users
     const cognitoUnauthenticatedRole = new iam.Role(
       this,
       "anonymous-group-role",
@@ -101,6 +102,7 @@ export class BlogseriesStack extends cdk.Stack {
         resources: ["*"],
     }));
 
+    // default role and permissions for authenticated users
     const cognitoAuthenticatedRole = new iam.Role(this, "users-group-role", {
       description: "Default role for authenticated users",
       assumedBy: new iam.FederatedPrincipal(
@@ -116,7 +118,6 @@ export class BlogseriesStack extends cdk.Stack {
         "sts:AssumeRoleWithWebIdentity"
       ),
     });
-
     cognitoAuthenticatedRole.addToPolicy(new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
@@ -126,7 +127,7 @@ export class BlogseriesStack extends cdk.Stack {
         ],
         resources: ["*"],
     }));
-
+    // choose (preferred) role for authenticated users from ID token 
     new cognito.CfnIdentityPoolRoleAttachment(
       this,
       "identity-pool-role-attachment",
@@ -150,27 +151,18 @@ export class BlogseriesStack extends cdk.Stack {
       }
     );
 
-    // create s3 bucket to upload documents
-    const s3Bucket = new s3.Bucket(this, "s3-bucket", {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-      versioned: false,
-      publicReadAccess: false,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      cors: [
-        {
-          allowedMethods: [
-            s3.HttpMethods.GET,
-            s3.HttpMethods.POST,
-            s3.HttpMethods.PUT,
-          ],
-          allowedOrigins: ["*"], //updated in separate stack once the resource is created
-          allowedHeaders: ["*"],
-        },
-      ],
+    //Declare the User Pool Group IAM roles
+    const AdminGroupIAMrole = new iam.Role(this, "AdminRole", {
+      assumedBy: new iam.CompositePrincipal(
+        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
+          StringEquals: {
+            "cognito-identity.amazonaws.com:aud": identityPool.ref,
+          },
+        }),
+        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`)
+      ),
     });
 
-    //Declare the User Pool Group IAM role
     const C1groupIAMrole = new iam.Role(this, "C1Role", {
       assumedBy: new iam.CompositePrincipal(
         new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
@@ -193,18 +185,15 @@ export class BlogseriesStack extends cdk.Stack {
       ),
     });
 
-    const AdminGroupIAMrole = new iam.Role(this, "AdminRole", {
-      assumedBy: new iam.CompositePrincipal(
-        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
-          StringEquals: {
-            "cognito-identity.amazonaws.com:aud": identityPool.ref,
-          },
-        }),
-        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`)
-      ),
-    });
-
     //Declare the User Pool Groups
+    const cfnUserPoolGroupAdmin = new cognito.CfnUserPoolGroup(this, "Admin", {
+      userPoolId: userPool.userPoolId,
+      description: "Admin group",
+      groupName: "Admin",
+      precedence: 1,
+      roleArn: AdminGroupIAMrole.roleArn,
+    });
+    
     const cfnUserPoolGroupC1 = new cognito.CfnUserPoolGroup(this, "C1", {
       userPoolId: userPool.userPoolId,
       description: "C1 group",
@@ -221,12 +210,24 @@ export class BlogseriesStack extends cdk.Stack {
       roleArn: C2groupIAMrole.roleArn,
     });
 
-    const cfnUserPoolGroupAdmin = new cognito.CfnUserPoolGroup(this, "Admin", {
-      userPoolId: userPool.userPoolId,
-      description: "Admin group",
-      groupName: "Admin",
-      precedence: 1,
-      roleArn: AdminGroupIAMrole.roleArn,
+    // create s3 bucket to upload documents
+    const s3Bucket = new s3.Bucket(this, "s3-bucket", {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      versioned: false,
+      publicReadAccess: false,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      cors: [
+        {
+          allowedMethods: [
+            s3.HttpMethods.GET,
+            s3.HttpMethods.POST,
+            s3.HttpMethods.PUT,
+          ],
+          allowedOrigins: ["*"], //updated in separate stack once the resource is created
+          allowedHeaders: ["*"],
+        },
+      ],
     });
 
     // create a S3 put policy statement
@@ -241,7 +242,7 @@ export class BlogseriesStack extends cdk.Stack {
     });
 
     const assumeRoleCognitoPolicy = new iam.PolicyStatement({
-      //FIX resource with roles to assume and add trust relationship
+      //TODO - Fix resource with roles to assume and add trust relationship
       actions: ["sts:AssumeRole"],
       effect: iam.Effect.ALLOW,
       resources: [
@@ -546,6 +547,12 @@ export class BlogseriesStack extends cdk.Stack {
     });
     new cdk.CfnOutput(this, "region", {
       value: cdk.Stack.of(this).region,
+    });
+
+    // exports to create demo data via separate cdk stack
+    new cdk.CfnOutput(this, "userPoolId", {
+      value: userPool.userPoolId,
+      exportName: 'userPoolId',
     });
   }
 }
