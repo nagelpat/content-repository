@@ -12,19 +12,19 @@ export class DemoDataStack extends cdk.Stack {
     const importedUserPoolArn = cdk.Fn.importValue('userPoolArn');
 
 
-    const userGroup = "engineering";
+    const userGroup = "C1";
 
     // create Cognito User Pool (CUP) users
     const user1: Object = {
-      name: 'user5',
+      name: 'user7',
       group: userGroup,
-      password: 'OpenSearch2021!',
+      password: (Math.random()+1).toString(36).substr(2,8),
     };
 
     const user2: Object = {
-      name: 'user6',
+      name: 'user8',
       group: userGroup,
-      password: 'OpenSearch2021!',
+      password: (Math.random()+1).toString(36).substr(2,8),
     };
 
     const userData = JSON.stringify([user1,user2]);

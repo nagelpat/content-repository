@@ -26,14 +26,14 @@ export class BlogseriesStack extends cdk.Stack {
       autoVerify: { //TODO might need to be removed when email is not set
         email: true,
       },
-      passwordPolicy: {
-        minLength: 6,
-        requireLowercase: true,
-        requireDigits: true,
+      passwordPolicy: { // demo purpose only. change to a more secure policy.
+        minLength: 8,
+        requireLowercase: false,
+        requireDigits: false,
         requireUppercase: false,
         requireSymbols: false,
       },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY, //TODO NONE
+      accountRecovery: cognito.AccountRecovery.NONE,
       signInCaseSensitive: false,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
