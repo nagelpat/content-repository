@@ -3,18 +3,31 @@ import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as triggers from "aws-cdk-lib/triggers";
-//import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 
 export class DemoDataStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const importedUserPoolId = cdk.Fn.importValue('userPoolId');
+    const importedUserPoolArn = cdk.Fn.importValue('userPoolArn');
 
-    // demo data to create cognito user pool (CUP) users and groups
-    const userData = '[{"name":"user3","group":"engineering","password":"User2022!"},{"name":"user4","group":"marketing","password":"User2022!"}]';
-    //const secret = new secretsmanager.Secret(this, 'Secret');
-    //console.log(secret.secretValue);
+
+    const userGroup = "engineering";
+
+    // create Cognito User Pool (CUP) users
+    const user1: Object = {
+      name: 'user5',
+      group: userGroup,
+      password: 'OpenSearch2021!',
+    };
+
+    const user2: Object = {
+      name: 'user6',
+      group: userGroup,
+      password: 'OpenSearch2021!',
+    };
+
+    const userData = JSON.stringify([user1,user2]);
 
     // trigger deployment of amplify hosted react app
     new triggers.TriggerFunction(cdk.Stack.of(this), "cdkTriggerDemoData", {

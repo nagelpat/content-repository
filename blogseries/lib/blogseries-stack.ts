@@ -554,5 +554,9 @@ export class BlogseriesStack extends cdk.Stack {
       value: userPool.userPoolId,
       exportName: 'userPoolId',
     });
+    new cdk.CfnOutput(this, "userPoolArn", {
+      value: userPool.userPoolArn,
+      exportName: 'userPoolArn',
+    });
   }
 }
