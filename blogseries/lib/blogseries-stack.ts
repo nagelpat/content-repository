@@ -170,7 +170,7 @@ export class BlogseriesStack extends cdk.Stack {
             "cognito-identity.amazonaws.com:aud": identityPool.ref,
           },
         }),
-        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`)
+        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`).withSessionTags(),
       ),
     });
 
@@ -181,7 +181,7 @@ export class BlogseriesStack extends cdk.Stack {
             "cognito-identity.amazonaws.com:aud": identityPool.ref,
           },
         }),
-        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`)
+        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`).withSessionTags(),
       ),
     });
 
@@ -234,17 +234,19 @@ export class BlogseriesStack extends cdk.Stack {
     // create a S3 put policy statement
     const s3PutObjectPolicy = new iam.PolicyStatement({
       actions: ["s3:PutObject", "s3:PutObjectTagging"],
-      resources: [`${s3Bucket.bucketArn}/*`],
+      //resources: [`${s3Bucket.bucketArn}/*`],
+      resources: [`${s3Bucket.bucketArn}/`+"${aws:PrincipalTag/groupname}/*"],
     });
 
     const s3ListBucketPolicy = new iam.PolicyStatement({
       actions: ["s3:ListBucket"],
       resources: [`${s3Bucket.bucketArn}`],
+      //resources: [`${s3Bucket.bucketArn}/`+"${aws:PrincipalTag/groupname}"],
     });
 
     const assumeRoleCognitoPolicy = new iam.PolicyStatement({
       //TODO - Fix resource with roles to assume and add trust relationship
-      actions: ["sts:AssumeRole"],
+      actions: ["sts:AssumeRole", "sts:TagSession"],
       effect: iam.Effect.ALLOW,
       resources: [
         "arn:aws:iam::" + `${cdk.Stack.of(this).account}` + ":role/*",

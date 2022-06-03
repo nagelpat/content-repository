@@ -26,7 +26,14 @@ def lambda_handler(event, context):
     # assume execution role based on preferred cognito user pool group
     response = sts_client.assume_role(
         RoleArn=preferred_role_arn,
-        RoleSessionName='ListAPIrole'
+        RoleSessionName='ListAPIrole',
+        # adding preferred group name to the session to use it as attribute based access control policy  
+        Tags=[
+        {
+            'Key': 'groupname',
+            'Value': f"{preferred_group_name}"
+        },
+    ]
     )
     credentials=response['Credentials']
     
