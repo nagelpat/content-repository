@@ -224,7 +224,8 @@ export class BlogseriesStack extends cdk.Stack {
             s3.HttpMethods.POST,
             s3.HttpMethods.PUT,
           ],
-          allowedOrigins: ["*"], //updated in separate stack once the resource is created
+          //updated as part of the build and deploy pipeline of the Amplify hosted front-end application
+          allowedOrigins: ["*"], 
           allowedHeaders: ["*"],
         },
       ],
