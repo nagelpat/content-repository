@@ -2,34 +2,93 @@ import { Construct } from "constructs";
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as triggers from "aws-cdk-lib/triggers";
 
 export class DemoDataStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // imported data from Blogseries infrastructure stack
     const importedUserPoolId = cdk.Fn.importValue('userPoolId');
     const importedUserPoolArn = cdk.Fn.importValue('userPoolArn');
+    const importedIdentityPoolRef = cdk.Fn.importValue('identityPoolRef');
+    const importedDocumentStoreBucketArn = cdk.Fn.importValue('documentStoreBucketArn');
 
+    // Declare the IAM roles mapped to the Cognito User Pool (CUP) groups
+    const SalesGroupIAMrole = new iam.Role(this, "SalesIAMRole", {
+      assumedBy: new iam.CompositePrincipal(
+        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
+          StringEquals: {
+            "cognito-identity.amazonaws.com:aud": importedIdentityPoolRef
+          },
+        }),
+        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`).withSessionTags(),
+      ),
+    });
 
-    const userGroup = "C1";
+    const MarketingGroupIAMrole = new iam.Role(this, "MarketingIAMRole", {
+      assumedBy: new iam.CompositePrincipal(
+        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
+          StringEquals: {
+            "cognito-identity.amazonaws.com:aud": importedIdentityPoolRef,
+          },
+        }),
+        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`).withSessionTags(),
+      ),
+    });
 
+    // Create Cognito User Pool (CUP) groups and assign IAM role    
+    const cfnUserPoolGroupSales = new cognito.CfnUserPoolGroup(this, "cup_group_sales", {
+      userPoolId: importedUserPoolId,
+      description: "Sales group",
+      groupName: "sales",
+      precedence: 1,
+      roleArn: SalesGroupIAMrole.roleArn,
+    });
+
+    const cfnUserPoolGroupMarketing = new cognito.CfnUserPoolGroup(this, "cup_group_marketing", {
+      userPoolId: importedUserPoolId,
+      description: "Marketing group",
+      groupName: "marketing",
+      precedence: 2,
+      roleArn: MarketingGroupIAMrole.roleArn,
+    });
+
+    // create policy statements to access the S3 content based on (CUP) group membership
+    const s3PutObjectPolicy = new iam.PolicyStatement({
+      actions: ["s3:PutObject", "s3:PutObjectTagging"],
+      //resources: [`${s3Bucket.bucketArn}/*`],
+      resources: [importedDocumentStoreBucketArn+"/"+"${aws:PrincipalTag/groupname}/*"],
+    });
+
+    const s3ListBucketPolicy = new iam.PolicyStatement({
+      actions: ["s3:ListBucket"],
+      resources: [importedDocumentStoreBucketArn],
+      //resources: [`${s3Bucket.bucketArn}/`+"${aws:PrincipalTag/groupname}"],
+    });    
+
+    SalesGroupIAMrole.addToPolicy(s3PutObjectPolicy);
+    SalesGroupIAMrole.addToPolicy(s3ListBucketPolicy);
+    MarketingGroupIAMrole.addToPolicy(s3PutObjectPolicy);
+    MarketingGroupIAMrole.addToPolicy(s3ListBucketPolicy);
+    
     // create Cognito User Pool (CUP) users
-    const user1: Object = {
-      name: 'user7',
-      group: userGroup,
+    const sales_user: Object = {
+      name: 'sales_user',
+      group: cfnUserPoolGroupSales.groupName,
       password: (Math.random()+1).toString(36).substr(2,8),
     };
 
-    const user2: Object = {
-      name: 'user8',
-      group: userGroup,
+    const marketing_user: Object = {
+      name: 'marketing_user',
+      group: cfnUserPoolGroupMarketing.groupName,
       password: (Math.random()+1).toString(36).substr(2,8),
     };
 
-    const userData = JSON.stringify([user1,user2]);
+    const userData = JSON.stringify([sales_user,marketing_user]);
 
-    // trigger deployment of amplify hosted react app
+    // trigger creation of Cognito User Pool (CUP) users and add them to the respective group
     new triggers.TriggerFunction(cdk.Stack.of(this), "cdkTriggerDemoData", {
       environment: {
         userPoolId: importedUserPoolId,

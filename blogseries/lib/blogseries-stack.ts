@@ -151,65 +151,6 @@ export class BlogseriesStack extends cdk.Stack {
       }
     );
 
-    //Declare the User Pool Group IAM roles
-    const AdminGroupIAMrole = new iam.Role(this, "AdminRole", {
-      assumedBy: new iam.CompositePrincipal(
-        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
-          StringEquals: {
-            "cognito-identity.amazonaws.com:aud": identityPool.ref,
-          },
-        }),
-        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`)
-      ),
-    });
-
-    const C1groupIAMrole = new iam.Role(this, "C1Role", {
-      assumedBy: new iam.CompositePrincipal(
-        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
-          StringEquals: {
-            "cognito-identity.amazonaws.com:aud": identityPool.ref,
-          },
-        }),
-        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`).withSessionTags(),
-      ),
-    });
-
-    const C2groupIAMrole = new iam.Role(this, "C2Role", {
-      assumedBy: new iam.CompositePrincipal(
-        new iam.WebIdentityPrincipal("cognito-identity.amazonaws.com", {
-          StringEquals: {
-            "cognito-identity.amazonaws.com:aud": identityPool.ref,
-          },
-        }),
-        new iam.AccountPrincipal(`${cdk.Stack.of(this).account}`).withSessionTags(),
-      ),
-    });
-
-    //Declare the User Pool Groups
-    const cfnUserPoolGroupAdmin = new cognito.CfnUserPoolGroup(this, "Admin", {
-      userPoolId: userPool.userPoolId,
-      description: "Admin group",
-      groupName: "Admin",
-      precedence: 1,
-      roleArn: AdminGroupIAMrole.roleArn,
-    });
-    
-    const cfnUserPoolGroupC1 = new cognito.CfnUserPoolGroup(this, "C1", {
-      userPoolId: userPool.userPoolId,
-      description: "C1 group",
-      groupName: "C1",
-      precedence: 2,
-      roleArn: C1groupIAMrole.roleArn,
-    });
-
-    const cfnUserPoolGroupC2 = new cognito.CfnUserPoolGroup(this, "C2", {
-      userPoolId: userPool.userPoolId,
-      description: "C2 group",
-      groupName: "C2",
-      precedence: 3,
-      roleArn: C2groupIAMrole.roleArn,
-    });
-
     // create s3 bucket to upload documents
     const s3Bucket = new s3.Bucket(this, "s3-bucket", {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -230,39 +171,6 @@ export class BlogseriesStack extends cdk.Stack {
         },
       ],
     });
-
-    // create a S3 put policy statement
-    const s3PutObjectPolicy = new iam.PolicyStatement({
-      actions: ["s3:PutObject", "s3:PutObjectTagging"],
-      //resources: [`${s3Bucket.bucketArn}/*`],
-      resources: [`${s3Bucket.bucketArn}/`+"${aws:PrincipalTag/groupname}/*"],
-    });
-
-    const s3ListBucketPolicy = new iam.PolicyStatement({
-      actions: ["s3:ListBucket"],
-      resources: [`${s3Bucket.bucketArn}`],
-      //resources: [`${s3Bucket.bucketArn}/`+"${aws:PrincipalTag/groupname}"],
-    });
-
-    const assumeRoleCognitoPolicy = new iam.PolicyStatement({
-      //TODO - Fix resource with roles to assume and add trust relationship
-      actions: ["sts:AssumeRole", "sts:TagSession"],
-      effect: iam.Effect.ALLOW,
-      resources: [
-        "arn:aws:iam::" + `${cdk.Stack.of(this).account}` + ":role/*",
-      ],
-    });
-
-    const cognitoIDPAdminPolicy = new iam.PolicyStatement({
-      actions: ["cognito-idp:AdminListGroupsForUser"],
-      resources: [`${userPool.userPoolArn}`],
-    });
-
-    C1groupIAMrole.addToPolicy(s3PutObjectPolicy);
-    C1groupIAMrole.addToPolicy(s3ListBucketPolicy);
-    C2groupIAMrole.addToPolicy(s3PutObjectPolicy);
-    C2groupIAMrole.addToPolicy(s3ListBucketPolicy);
-    s3Bucket.grantReadWrite(AdminGroupIAMrole);
 
     // creation of the source control repository for the react frontend app hosted on Amplify
     const repository = new codecommit.Repository(this, "frontend-code-repo", {
@@ -399,6 +307,20 @@ export class BlogseriesStack extends cdk.Stack {
       handler: "presignedURL.lambda_handler",
       timeout: cdk.Duration.seconds(30),
       runtime: lambda.Runtime.PYTHON_3_8,
+    });
+
+    const cognitoIDPAdminPolicy = new iam.PolicyStatement({
+      actions: ["cognito-idp:AdminListGroupsForUser"],
+      resources: [`${userPool.userPoolArn}`],
+    });
+
+    const assumeRoleCognitoPolicy = new iam.PolicyStatement({
+      //TODO - Fix resource with roles to assume and add trust relationship
+      actions: ["sts:AssumeRole", "sts:TagSession"],
+      effect: iam.Effect.ALLOW,
+      resources: [
+        "arn:aws:iam::" + `${cdk.Stack.of(this).account}` + ":role/*",
+      ],
     });
 
     presignedURLLambda.role?.attachInlinePolicy(
@@ -561,5 +483,14 @@ export class BlogseriesStack extends cdk.Stack {
       value: userPool.userPoolArn,
       exportName: 'userPoolArn',
     });
+    new cdk.CfnOutput(this, "identityPoolRef", {
+      value: identityPool.ref,
+      exportName: 'identityPoolRef',
+    });
+    new cdk.CfnOutput(this, "documentStoreBucketArn", {
+      value: s3Bucket.bucketArn,
+      exportName: 'documentStoreBucketArn',
+    });
+    
   }
 }
