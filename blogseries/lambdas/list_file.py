@@ -48,8 +48,11 @@ def lambda_handler(event, context):
     
     # return the list of keys in the S3 bucket that matches the preferred group name prefix
     keys = []
-    for key in s3_client.list_objects(Bucket=bucket_name,Prefix=preferred_group_name)['Contents']:
-        keys.append(key['Key']) 
+    s3_objects = s3_client.list_objects(Bucket=bucket_name,Prefix=preferred_group_name)
+    # check for empty bucket/prefix
+    if 'Contents' in s3_objects:
+        for key in s3_objects['Contents']:
+            keys.append(key['Key']) 
     
     response2api = {"statusCode": 200,"headers": { 'Access-Control-Allow-Origin': allow_origins,
                 'Access-Control-Allow-Credentials': 'true',
