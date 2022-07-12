@@ -55,23 +55,40 @@ export class DemoDataStack extends cdk.Stack {
       roleArn: MarketingGroupIAMrole.roleArn,
     });
 
-    // create policy statements to access the S3 content based on (CUP) group membership
+    // create policy statements to access the S3 content based on (CUP) group membership session tags
     const s3PutObjectPolicy = new iam.PolicyStatement({
       actions: ["s3:PutObject", "s3:PutObjectTagging"],
-      //resources: [`${s3Bucket.bucketArn}/*`],
       resources: [importedDocumentStoreBucketArn+"/"+"${aws:PrincipalTag/groupname}/*"],
     });
 
-    const s3ListBucketPolicy = new iam.PolicyStatement({
+    const s3AllowListBucketPolicy = new iam.PolicyStatement({
       actions: ["s3:ListBucket"],
+      effect: iam.Effect.ALLOW,
       resources: [importedDocumentStoreBucketArn],
-      //resources: [`${s3Bucket.bucketArn}/`+"${aws:PrincipalTag/groupname}"],
+      conditions: {
+        "StringEquals": {
+          "s3:prefix": "${aws:PrincipalTag/groupname}",
+        },
+      },
+    });
+
+    const s3DenyListBucketPolicy = new iam.PolicyStatement({
+      actions: ["s3:ListBucket"],
+      effect: iam.Effect.DENY,
+      resources: [importedDocumentStoreBucketArn],
+      conditions: {
+        "StringNotEquals": {
+          "s3:prefix": "${aws:PrincipalTag/groupname}",
+        },
+      },
     });    
 
     SalesGroupIAMrole.addToPolicy(s3PutObjectPolicy);
-    SalesGroupIAMrole.addToPolicy(s3ListBucketPolicy);
+    SalesGroupIAMrole.addToPolicy(s3AllowListBucketPolicy);
+    SalesGroupIAMrole.addToPolicy(s3DenyListBucketPolicy);
     MarketingGroupIAMrole.addToPolicy(s3PutObjectPolicy);
-    MarketingGroupIAMrole.addToPolicy(s3ListBucketPolicy);
+    MarketingGroupIAMrole.addToPolicy(s3AllowListBucketPolicy);
+    MarketingGroupIAMrole.addToPolicy(s3DenyListBucketPolicy);
     
     // create Cognito User Pool (CUP) users
     const sales_user: Object = {
